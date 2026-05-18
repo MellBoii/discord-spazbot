@@ -1,1 +1,1 @@
-py C:\Users\Mell\Downloads\discord-spazbot\bot.py
+py bot.py

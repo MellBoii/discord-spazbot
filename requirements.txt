@@ -5,3 +5,4 @@ python-dotenv
 pyttsx3
 playsound3
 mss
+requests
