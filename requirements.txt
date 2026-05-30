@@ -6,3 +6,4 @@ pyttsx3
 playsound3
 mss
 requests
+langstr

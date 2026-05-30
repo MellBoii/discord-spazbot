@@ -15,7 +15,6 @@ import discord
 import requests
 import sys
 import os
-import pyttsx3
 from mss import mss
 from pathlib import Path
 import mss
@@ -84,8 +83,6 @@ class HelpView(discord.ui.View):
 class General(commands.Cog, name="General"):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.tts_engine = pyttsx3.init()
-        self.tts_engine.runAndWait()
 
     @commands.hybrid_command(
         name="help",
@@ -159,9 +156,6 @@ class General(commands.Cog, name="General"):
             await ctx.send("pings aren't allowed in say!")
             return
         await ctx.send(message)
-        # FIXME: discord has a feature for tts.
-        # use that maybe??
-        self.tts_engine.say(message)
         
     @commands.hybrid_command(
         name="ping",

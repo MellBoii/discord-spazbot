@@ -16,6 +16,7 @@ import time
 import aiohttp
 import math
 import asyncio
+import langstr
 
 import aiosqlite
 import discord
@@ -142,6 +143,8 @@ class SpazBot(commands.Bot):
         self.database = None
         self.bot_prefix = os.getenv("PREFIX")
         self.invite_link = os.getenv("INVITE_LINK")
+        lang_path = os.path.realpath(os.path.dirname(__file__)) + '/lang'
+        langstr.set_path(lang_path)
 
     async def init_db(self) -> None:
         async with aiosqlite.connect(
