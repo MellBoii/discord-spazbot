@@ -1,3 +1,13 @@
 {
-	"langStrCheckText": "If you're reading this, that means LangStr is working. Yippee!"
+	"langStrCheckText": "If you're reading this, that means LangStr is working. Yippee!",
+	"languageSet": "Okay. set language set to ${LANG}.",
+	"unknownLanguage": "ERROR: Language ${LANG} is a invalid language.\nAvailable languages are: ${LIST}",
+	"funFactText": "fun fact: ${TEXT}",
+	"funFact1": "spaz tickets and tokens are both heavily based on Gummy's Overhaul's gumcoins and gumdollars, and the usual tickets and tokens",
+	"funFact2": "the tickets are purple because im purple :troll:",
+	"funFact3": "(bombsquda) hitting a player on the head with a bomb INSTANTLY kills them,\nalong with giving you some tickets",
+	"funFact4": "i'm eating ram right now!",
+	"funFact5": "buddie-bot is my twinny twin twin ong",
+	"funFact6": "spazbot, the leaderboard, and bombsquda itself is completely open source!\nyou can check them out using the links below.\nhttps://github.com/MellBoii1/bombsquda-server\nhttps://github.com/MellBoii1/discord-spazbot\nhttps://github.com/MellBoii1/bombsquda",
+	"t": "t"
 }

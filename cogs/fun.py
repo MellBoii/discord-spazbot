@@ -8,6 +8,9 @@ import discord
 import typing
 import asyncio
 import subprocess
+import langstr
+import math
+import datetime
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
@@ -21,20 +24,6 @@ DATA_FILE = path
 # discord, it's markdown changes
 TICKETS_EMOJI = "<:spaztix:1470673170427285608>"
 TOKENS_EMOJI = "<:spaztokens:1470673171618336809>"
-FUN_FACTS = [
-    "spaz tickets and tokens are both heavily based on Gummy's Overhaul's gumcoins and gumdollars, and the usual tickets and tokens",
-    "(bombsquda) hitting a player on the head with a bomb INSTANTLY kills them,\nalong with giving you some tickets",
-    "the tickets are purple because im purple :troll:",
-    "i'm eating ram right now!",
-    "buddie-bot is my twinny twin twin ong",
-    (
-        "spazbot, the leaderboard, and bombsquda itself is "
-        "completely open source!\nyou can check them out using the links below."
-        "\nhttps://github.com/MellBoii1/bombsquda-server"
-        "\nhttps://github.com/MellBoii1/discord-spazbot"
-        "\nhttps://github.com/MellBoii1/bombsquda"
-    ),
-]
 RANDOM_GETTICKETS = [
     "you robbed a random bank and got {tickets} {e}tickets.",
     "you found {tickets} {e}tickets on the ground, and took em for yourself.\n...jeez, thats a lot",
@@ -156,34 +145,34 @@ SHOP_ITEMS = {
         "price": 1000,
         "currency": "tickets",
         "description": "Trade 1000 tickets for a token.",
-        "effect": lambda self, user_id, amount: self.add_value(user_id, "tokens", amount)
+        "effect": lambda self, user_id, amount: self.bot.add_value(user_id, "tokens", amount)
     },
     "tickets": {
         "price": 1,
         "currency": "tokens",
         "description": "Trade 1 token for 1000 tickets.",
-        "effect": lambda self, user_id, amount: self.add_value(user_id, "tickets", 1000 * amount)
+        "effect": lambda self, user_id, amount: self.bot.add_value(user_id, "tickets", 1000 * amount)
     },
     "title: ULTRAGAMBLER": {
         "price": 4000,
         "currency": "tickets",
         "description": "Unlock the title 'ULTRAGAMBLER' for your profile.",
         "extradesc": "This will multiply the amount of money you get **(and lose)** from gambling by 2, and jackpot chance by 15%",
-        "effect": lambda self, user_id, amount: self.set_value(user_id, "title", "ULTRAGAMBLER")
+        "effect": lambda self, user_id, amount: self.bot.set_value(user_id, "title", "ULTRAGAMBLER")
     },
     "title: Addicted to Gambling": {
         "price": 8000,
         "currency": "tickets",
         "description": "Unlock the title 'Addicted to Gambling'",
         "extradesc": "This will multiply the amount of money you get **(and lose)** from gambling by 3, and jackpot chance by 20%",
-        "effect": lambda self, user_id, amount: self.set_value(user_id, "title", "Addicted to Gambling")
+        "effect": lambda self, user_id, amount: self.bot.set_value(user_id, "title", "Addicted to Gambling")
     },
     "title: Total SpazBot Enthusiast": {
         "price": 12000,
         "currency": "tickets",
         "description": "Unlock the title 'Total SpazBot Enthusiast' for your profile.",
         "extradesc": "This does not unlock any extra abilities.",
-        "effect": lambda self, user_id, amount: self.set_value(user_id, "title", "Total SpazBot Enthusiast")
+        "effect": lambda self, user_id, amount: self.bot.set_value(user_id, "title", "Total SpazBot Enthusiast")
     },
     "rob_multiplier": {
         "price": 60,
@@ -193,12 +182,13 @@ SHOP_ITEMS = {
     }
 }
 
-DOWNLOADS = Path.home() / "Downloads"
-IMAGES = Path.home() / "Pictures"
-SQUDAPNG = Path.home() / "Downloads/bombsqudapng"
-RESPACK = Path.home() / "Downloads/mell's resource pack"
-SQUDAPNGEX = Path.home() / "Downloads/bombsqudapng/the other folder"
-BOREDFOLDER = Path.home() / "Downloads/the im bored folder"
+IMAGES = [
+    Path.home() / "Pictures",
+    Path.home() / "Downloads",
+    Path.home() / "Downloads/bombsqudapng",
+    Path.home() / "Downloads/bombsqudapng/the other folder",
+    Path.home() / "Downloads/the im bored folder",
+]
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 SOUND_EXTENSIONS = {".mp3", ".wav", ".ogg"}
@@ -250,14 +240,11 @@ def find_sounds_recursive(folder):
     return found
 
 def pick_random_image():
-    items = list(DOWNLOADS.iterdir())
-    # REMOVE THESE BELOW IF THEY DONT WORK
-    # (custom folders for me)
-    items.extend(list(IMAGES.iterdir()))
-    items.extend(list(SQUDAPNG.iterdir()))
-    items.extend(list(SQUDAPNGEX.iterdir()))
-    items.extend(list(BOREDFOLDER.iterdir()))
-    items.extend(list(RESPACK.iterdir()))
+    items = []
+    for path in IMAGES:
+        items.extend(
+            list(path.iterdir())
+        )
     random.shuffle(items)
 
     for item in items:
@@ -280,7 +267,11 @@ def pick_random_image():
     return None
 
 def pick_random_sound():
-    items = list(DOWNLOADS.iterdir())
+    items = []
+    for path in IMAGES:
+        items.extend(
+            list(path.iterdir())
+        )
     random.shuffle(items)
 
     for item in items:
@@ -317,37 +308,6 @@ class CurrencyShareView(discord.ui.View):
 
         self.title = f"confirmation for {self.author.display_name}"
 
-    # ---------------- data helpers ----------------
-
-    def load_data(self):
-        if not os.path.exists(DATA_FILE):
-            return {}
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_data(self, data):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-
-    def get_value(self, user_id: int, label: str, default=0):
-        data = self.load_data()
-        return data.get(str(user_id), {}).get(label, default)
-
-    def set_value(self, user_id: int, label: str, value):
-        data = self.load_data()
-        uid = str(user_id)
-        if uid not in data:
-            data[uid] = {}
-        data[uid][label] = value
-        self.save_data(data)
-
-    def add_value(self, user_id: int, label: str, amount: int):
-        current = self.get_value(user_id, label, 0)
-        self.set_value(user_id, label, current + amount)
-        return current + amount
-
-    # ---------------- buttons ----------------
-
     @discord.ui.button(
         label="",
         style=discord.ButtonStyle.green,
@@ -375,8 +335,8 @@ class CurrencyShareView(discord.ui.View):
         await self.contexto.send(self.user.mention)
         await interaction.response.edit_message(embed=embed)
         # add (and remove) the values
-        self.add_value(self.user.id, self.currency_key, self.amount)
-        self.add_value(self.author.id, self.currency_key, -self.amount)
+        self.bot.add_value(self.user.id, self.currency_key, self.amount)
+        self.bot.add_value(self.author.id, self.currency_key, -self.amount)
         self.stop()
 
     @discord.ui.button(
@@ -470,50 +430,17 @@ class LeaderboardView(discord.ui.View):
 class Fun(commands.Cog, name="Fun"):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.allow_shots = True
-        
-    # --------------------------- DATA LOADER --------------------------   
-    def load_data(self):
-        if not os.path.exists(DATA_FILE):
-            return {}
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_data(self, data):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
-
-    def get_value(self, user_id: int, label: str, default=0):
-        data = self.load_data()
-        return data.get(str(user_id), {}).get(label, default)
-
-    def set_value(self, user_id: int, label: str, value):
-        data = self.load_data()
-        uid = str(user_id)
-        if uid not in data:
-            data[uid] = {}
-        data[uid][label] = value
-        self.save_data(data)
-
-    def add_value(self, user_id: int, label: str, amount: int = 1):
-        current = self.get_value(user_id, label, 0)
-        self.set_value(user_id, label, current + amount)
-        return current + amount
-
-    def all_values(self, user_id: int):
-        data = self.load_data()
-        return data.get(str(user_id), {})
-    # --------------------------- DATA LOADER --------------------------    
+        self.allow_shots = True  
 
     def add_rob_multi(self, user_id: int):
-        expirations = self.get_value(user_id, "rob_multi_expirations", [])
+        expirations = self.bot.get_value(user_id, "rob_multi_expirations", [])
         if not isinstance(expirations, list):
             expirations = []
         expirations.append(time.time() + ROB_MULTI_DURATION)
-        self.set_value(user_id, "rob_multi_expirations", expirations)
+        self.bot.set_value(user_id, "rob_multi_expirations", expirations)
 
     def clean_expired_rob_multi(self):
-        data = self.load_data()
+        data = self.bot.load_data()
         current_time = time.time()
         for uid, info in data.items():
             expirations = info.get("rob_multi_expirations", [])
@@ -521,7 +448,7 @@ class Fun(commands.Cog, name="Fun"):
                 active = [exp for exp in expirations if exp > current_time]
                 if active != expirations:
                     info["rob_multi_expirations"] = active
-        self.save_data(data)
+        self.bot.save_data(data)
 
     @commands.hybrid_group(name="shop", description="Shop subcommands")
     async def shop(self, ctx):
@@ -580,7 +507,7 @@ class Fun(commands.Cog, name="Fun"):
             return
         data = SHOP_ITEMS[matched_item]
         total_price = data['price'] * amount
-        balance = self.get_value(ctx.author.id, data['currency'])
+        balance = self.bot.get_value(ctx.author.id, data['currency'])
         if balance < total_price:
             await ctx.send(
                 f"you don't have enough {data['currency']}!\n"
@@ -588,7 +515,7 @@ class Fun(commands.Cog, name="Fun"):
             )
             return
         # Deduct currency
-        self.add_value(ctx.author.id, data['currency'], -total_price)
+        self.bot.add_value(ctx.author.id, data['currency'], -total_price)
         # Apply effect
         if 'effect' in data and data['effect']:
             data['effect'](self, ctx.author.id, amount)
@@ -605,7 +532,7 @@ class Fun(commands.Cog, name="Fun"):
     @commands.cooldown(1, 17, commands.BucketType.user)
     async def grind(self, ctx):
         value = random.randint(50, 200)
-        new_total = self.add_value(ctx.author.id, "tickets", value) # add total to user data
+        new_total = self.bot.add_value(ctx.author.id, "tickets", value) # add total to user data
 
         template = random.choice(RANDOM_GETTICKETS) # template
         message = template.format(tickets=value, e=TICKETS_EMOJI) # formatting (wow just like bombsquad's lstrs)
@@ -629,7 +556,7 @@ class Fun(commands.Cog, name="Fun"):
         cfg = CURRENCIES[currency] # wow  config
         emoji = cfg["emoji"] # emoji (duh!)
 
-        player_amount = self.get_value(ctx.author.id, currency) # wdym player? lol
+        player_amount = self.bot.get_value(ctx.author.id, currency) # wdym player? lol
 
         # -------- amount parsing --------
 
@@ -739,30 +666,30 @@ class Fun(commands.Cog, name="Fun"):
 
         # Balance checks
         # user's currency is below the minimum
-        if self.get_value(ctx.author.id, currency) < cdata["min_required"]:
+        if self.bot.get_value(ctx.author.id, currency) < cdata["min_required"]:
             await ctx.send(f"you need at least {cdata['min_required']} {display} to try that.")
             ctx.command.reset_cooldown(ctx)
             return
         # target user's currency is below the minimum
-        if self.get_value(user.id, currency) < cdata["min_required"]:
+        if self.bot.get_value(user.id, currency) < cdata["min_required"]:
             await ctx.send(f"hey come on, they don't even have {cdata['min_required']} {display}!")
             ctx.command.reset_cooldown(ctx)
             return
         value = random.randint(*cdata["range"])
         chance = 0.65 # more in favor of WINNNINNN
-        expirations = self.get_value(ctx.author.id, "rob_multi_expirations", [])
+        expirations = self.bot.get_value(ctx.author.id, "rob_multi_expirations", [])
         current_time = time.time()
         active = [exp for exp in expirations if exp > current_time]
         multiplier = len(active) * 0.15
-        self.set_value(ctx.author.id, "rob_multi_expirations", active)
+        self.bot.set_value(ctx.author.id, "rob_multi_expirations", active)
         if random.random() < chance + multiplier:
             msg = cdata["success"].format(v=value, target=user.mention, TICKETS_EMOJI=TICKETS_EMOJI, TOKENS_EMOJI=TOKENS_EMOJI,)
-            self.add_value(ctx.author.id, currency, value)
-            self.add_value(user.id, currency, -value)
+            self.bot.add_value(ctx.author.id, currency, value)
+            self.bot.add_value(user.id, currency, -value)
         else: # we absolutely failed
             msg = cdata["fail"].format(v=value, target=user.mention, TICKETS_EMOJI=TICKETS_EMOJI, TOKENS_EMOJI=TOKENS_EMOJI,)
-            self.add_value(ctx.author.id, currency, -value)
-            self.add_value(user.id, currency, value)
+            self.bot.add_value(ctx.author.id, currency, -value)
+            self.bot.add_value(user.id, currency, value)
         # now just reply i guess
         await ctx.reply(msg)
             
@@ -784,10 +711,12 @@ class Fun(commands.Cog, name="Fun"):
         currency, cdata = self.roll_currency()
         display = cdata["display"]
         kind = cdata.get("kind", "normal")
+        id = ctx.author.id
+        lang = self.bot.get_lang(id)
 
         # Cost check (only really matters for tickets)
         if cdata["min_cost"] > 0:
-            balance = self.get_value(ctx.author.id, currency)
+            balance = self.bot.get_value(ctx.author.id, currency)
             if balance < cdata["min_cost"]:
                 await ctx.send(
                     f"hey hang on, you need at least {cdata['min_cost']} {display}!"
@@ -799,7 +728,7 @@ class Fun(commands.Cog, name="Fun"):
         jackpot = False
         # More stats based on current title
         extraval = 0
-        title = self.get_value(ctx.author.id, 'title')
+        title = self.bot.get_value(ctx.author.id, 'title')
         if title == 'ULTRAGAMBLER':
             extraval = 0.15
         if title == 'Addicted to Gambling':
@@ -829,7 +758,7 @@ class Fun(commands.Cog, name="Fun"):
         if jackpot: # add prefix if needed
             msg = JACKPOT["prefix"] + msg
 
-        self.add_value(ctx.author.id, currency, value)
+        self.bot.add_value(ctx.author.id, currency, value)
         await ctx.reply(msg)
 
     @commands.hybrid_command(
@@ -854,7 +783,7 @@ class Fun(commands.Cog, name="Fun"):
             await ctx.reply('sorry, but spazbot is being run on a non-windows machine. ask whoever\'s hosting to switch over...')
             return
         # disable the command if we wish to
-        if not bool(False):
+        if not bool(True):
             await ctx.reply('sorry, this command is disabled for now...')
             return
             
@@ -909,6 +838,25 @@ class Fun(commands.Cog, name="Fun"):
                 await ctx.reply(f'whoops sorry, sound was too big for me to upload.\n-# {sound}')
         else:
             await ctx.reply('dint find a sound :(')
+    
+    @commands.hybrid_command(
+        name="how_much_longer_now_my_deltarune",
+        description="HOW MUCH LONGER NOW? MY. DELTA RUNE.",
+        aliases=["deltarune", "hmlnmd", "ch5_when", "ch5"],
+    )
+    async def deltarune(self, ctx: Context):
+        delta = datetime.datetime(2026, 6, 23)
+        today = datetime.datetime.today()
+        distance = delta - today
+        days = distance.days
+        time = distance.total_seconds()
+        hours = int(time / 3600)
+        mins = int(time / 60)
+        s = 'S' if days > 1 else ''
+        if days > 0:
+            await ctx.reply(f'{days} DAY{s}. {hours} HOURS, {mins} MINUTES.\nAND UNTIL THEN\nBE PATIENT')
+        else:
+            await ctx.reply('Check steam')
 
     # FIXME: this command is a joke
     # if we release spazbot publically, we should 
@@ -927,8 +875,18 @@ class Fun(commands.Cog, name="Fun"):
     )
     @commands.cooldown(1, 2, commands.BucketType.user)
     async def fun_fact(self, ctx):
-        msg = f"fun fact: {random.choice(FUN_FACTS)}"
-        await ctx.send(msg)
+        id = ctx.author.id
+        lang = self.bot.get_lang(id)
+        facts = [
+            langstr.LangStr(r=f'funFact{i + 1}', l=lang)
+            for i in range(6)
+        ]
+        lstr = langstr.LangStr(
+            r='funFactText', 
+            s=[('${TEXT}', random.choice(facts))],
+            l=lang,
+        )
+        await ctx.reply(lstr.evaluate())
 
     @commands.hybrid_command(
         name="stats",
@@ -944,7 +902,7 @@ class Fun(commands.Cog, name="Fun"):
         you = "You" if is_self else actuser.display_name
         have_has = "have" if is_self else "has"
 
-        values = self.all_values(actuser.id)
+        values = self.bot.all_values(actuser.id)
         if not values:
             await ctx.send(f"{you} {have_has} no stats yet.")
             return

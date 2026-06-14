@@ -1,3 +1,5 @@
 {
-	"langStrCheckText": "Si estás leyendo esto, LangStr está funcionando. !Hurra!"
+	"langStrCheckText": "Si estás leyendo esto, LangStr está funcionando. !Hurra!",
+	"languageSet": "De acuerdo. Se ha establecido el idioma a ${LANG}.",
+	"unknownLanguage": "ERROR: El idioma ${LANG} no es válido.\nLos idiomas disponibles son: ${LIST}"
 }

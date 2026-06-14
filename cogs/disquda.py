@@ -9,13 +9,11 @@ import discord
 import typing
 import requests
 import urllib
+import re
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import Context
-path = f'{__file__}\\userdata.json'.replace('\\', '/') 
-path = path.replace('cogs/disquda.py/', '') 
-USER_DATA_FILE = path
-URL = "https://bombsquda.tailc76b25.ts.net"
+URL = "http://104.196.199.18:5000/"
 
 class LeaderboardView(discord.ui.View):
     def __init__(self, ctx, data, format_time, pretty_name,
@@ -29,29 +27,45 @@ class LeaderboardView(discord.ui.View):
 
         self.difficulty = difficulty
         self.sort_mode = sort_mode
+        self.player_count = 0
 
         self.levels = self.filter_levels()
         self.page = 0
         self.per_page = 3
         self.max_page = max(0, math.ceil(len(self.levels) / self.per_page) - 1)
-        self.add_item(DifficultySelect())
-
-    # ----------------------------
-    # Filtering logic
-    # ----------------------------
+        self.add_item(DifficultySelect(self.difficulty))
+        self.add_item(PlayerCountSelect(self.player_count))
 
     def filter_levels(self):
-        if self.difficulty == "all":
-            return list(self.data.items())
+        levels = []
 
-        filtered = []
-        for level, entries in self.data.items():
-            if level.startswith("Easy:") and self.difficulty == "easy":
-                filtered.append((level, entries))
-            elif level.startswith("Default:") and self.difficulty == "hard":
-                filtered.append((level, entries))
+        categories = (
+            self.data.items()
+            if self.difficulty == "all"
+            else [(self.difficulty.title(), self.data.get(self.difficulty.title(), {}))]
+        )
 
-        return filtered
+        for category, category_levels in categories:
+            for level_name, level_data in category_levels.items():
+                level_name = self.pretty_name(level_name)
+                if self.player_count:
+                    has_matching_count = any(
+                        int(re.match(r"(\d+)", key).group(1))
+                        and int(
+                            re.match(r"(\d+)", key).group(1)
+                        ) == int(self.player_count)
+                        for key in level_data
+                        if key != "score_type"
+                    )
+
+                    if not has_matching_count:
+                        continue
+
+                levels.append(
+                    (category, level_name, level_data)
+                )
+
+        return levels
 
     # ----------------------------
     # Embed builder
@@ -59,7 +73,7 @@ class LeaderboardView(discord.ui.View):
 
     def build_embed(self):
         embed = discord.Embed(
-            title="BombSquda Co-op Best Times",
+            title="BombSquda Co-op Leaderboard",
             color=0x41ab4d
         )
 
@@ -67,37 +81,35 @@ class LeaderboardView(discord.ui.View):
         end = start + self.per_page
         page_levels = self.levels[start:end]
 
-        for level, entries in page_levels:
-            if not entries:
-                continue
-
-            reverse = self.sort_mode == "worst"
-            sorted_entries = sorted(
-                entries.items(),
-                key=lambda x: x[1],
-                reverse=reverse
-            )
+        for category, level_name, level_data in page_levels:
+            score_type = level_data.get("score_type", "points")
 
             lines = []
-            for i, (player, time) in enumerate(sorted_entries[:5], start=1):
-                lines.append(
-                    f"**{i}. {player}** — `{self.format_time(time)}`"
-                )
+
+            for key, scores in level_data.items():
+                if key == "score_type":
+                    continue
+                
+                import re
+                match = re.match(r"(\d+)", key)
+                player_count = int(match.group(1))
+                lines.append(f'{player_count} Players')
+                
+                for i, (score, player) in enumerate(scores, start=1):
+                    lines.append(
+                        f"**{i}. {player}** — `{score}`"
+                    )
+
+                lines.append("")
 
             embed.add_field(
-                name=self.pretty_name(level),
+                name=f"{category}: {level_name}",
                 value="\n".join(lines),
                 inline=False
             )
-
-        embed.set_footer(
-            text=f"Page {self.page+1}/{self.max_page+1} | "
-                 f"Filter: {self.difficulty.title()} | "
-                 f"Sort: {self.sort_mode.title()}"
-        )
-
-        return embed
         
+        return embed
+                
     @discord.ui.button(emoji="<a:darrow_left_big:1474535619798499352>", style=discord.ButtonStyle.gray)
     async def first_page(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.page = 0
@@ -138,21 +150,55 @@ class LeaderboardView(discord.ui.View):
         )
         
 class DifficultySelect(discord.ui.Select):
-    def __init__(self):
+    def __init__(self, current=''):
         options = [
             discord.SelectOption(label="All", value="all"),
             discord.SelectOption(label="Easy", value="easy"),
-            discord.SelectOption(label="Hard", value="hard"),
+            discord.SelectOption(label="Hard", value="default"),
+            discord.SelectOption(label="Challenges", value="challenges"),
         ]
 
         super().__init__(
-            placeholder="Filter Difficulty",
+            placeholder="Filter Difficulty/Campaign",
             options=options
         )
 
     async def callback(self, interaction: discord.Interaction):
         view: LeaderboardView = self.view
         view.difficulty = self.values[0]
+        view.levels = view.filter_levels()
+        view.page = 0
+        view.max_page = max(
+            0, math.ceil(len(view.levels) / view.per_page) - 1
+        )
+        for option in self.options:
+            option.default = option.default == self.values[0]
+
+        await interaction.response.edit_message(
+            embed=view.build_embed(),
+            view=view
+        )
+
+class PlayerCountSelect(discord.ui.Select):
+    def __init__(self, current=''):
+        options = [discord.SelectOption(label=f'Any', value=0)]
+        options.extend(
+            discord.SelectOption(
+                label=f'{i + 1} Players', 
+                value=i + 1,
+            )
+            for i in range(8)
+        )
+
+        super().__init__(
+            placeholder="Filter Player Count",
+            options=options
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: LeaderboardView = self.view
+        view.player_count = self.values[0]
+        print(self.values[0])
         view.levels = view.filter_levels()
         view.page = 0
         view.max_page = max(
@@ -167,45 +213,6 @@ class DifficultySelect(discord.ui.Select):
 class Disquda(commands.Cog, name="CrossSquda"):
     def __init__(self, bot) -> None:
         self.bot = bot
-        
-    # ------------------ DATA LOADER PART FUCKIN 2 ---------------------
-    def load_user_data(self):
-        if not os.path.exists(USER_DATA_FILE):
-            return {}
-        with open(USER_DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def save_user_data(self, data):
-        with open(USER_DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-    
-    def get_value(self, user_id: int, label: str, default=0):
-        data = self.load_user_data()
-        return data.get(str(user_id), {}).get(label, default)
-
-    def get_user(self, uid):
-        data = self.load_user_data()
-        return data.setdefault(str(uid), {})
-    
-    def set_value(self, user_id: int, label: str, value):
-        data = self.load_user_data()
-        uid = str(user_id)
-        if uid not in data:
-            data[uid] = {}
-        data[uid][label] = value
-        self.save_user_data(data)
-
-    def add_value(self, user_id: int, label: str, amount: int = 1):
-        current = self.get_value(user_id, label, 0)
-        self.set_value(user_id, label, current + amount)
-        return current + amount
-
-    def set_user_value(self, uid, key, value):
-        data = self.load_user_data()
-        user = data.setdefault(str(uid), {})
-        user[key] = value
-        self.save_user_data(data)
-    # ------------------ DATA LOADER PART FUCKIN 2 --------------------- 
     
     def format_time(self, t: float) -> str:
         h = int(t // 3600)
@@ -233,15 +240,16 @@ class Disquda(commands.Cog, name="CrossSquda"):
         return name.replace("_", " ")
         
     @commands.hybrid_command(
-        name="time_leaderboard",
-        description="show the leaderboard for best times on co-op levels"
+        name="scores_leaderboard",
+        description="show the leaderboard for best scores on co-op levels",
+        aliases=["sc_lb"],
     )
     @commands.cooldown(1, 15, commands.BucketType.user)
     async def leaderboard(self, context: Context):
         try:
             timeout = aiohttp.ClientTimeout(total=5)  # don't hang forever
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(f'{URL}/get/all') as resp:
+                async with session.get(f'{URL}/api/get_scores') as resp:
                     if resp.status != 200:
                         await context.send("failed to fetch leaderboard")
                         return
@@ -299,7 +307,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
             await ctx.reply("that doesn't look like a ID.")
             return
 
-        self.set_user_value(ctx.author.id, "squda_id", bs_id)
+        self.bot.set_value(ctx.author.id, "squda_id", bs_id)
         await ctx.reply(
             (
                 "the id was successfully linked!\nPS. don't share it to anyone, "
@@ -367,7 +375,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
                 read = response.read()
                 thefuckingjson = json.loads(read.decode('utf-8'))
                 new = thefuckingjson.get('new_bal')
-                self.add_value(ctx.author.id, currency, -amount)
+                self.bot.add_value(ctx.author.id, currency, -amount)
                 await ctx.reply(f'done! you deposited {amount} {currency}.\nyour bank now has: {new} {currency}.')
         except urllib.error.URLError as e:
             await ctx.reply('unable to connect! server is probably down.')
@@ -423,7 +431,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
                 read = response.read()
                 thefuckingjson = json.loads(read.decode('utf-8'))
                 new = thefuckingjson.get('new_bal')
-                self.add_value(ctx.author.id, currency, amount)
+                self.bot.add_value(ctx.author.id, currency, amount)
                 await ctx.reply(f'done! you withdrew {amount} {currency}.\nyour bank now has: {new} {currency}.')
         except urllib.error.URLError as e:
             await ctx.reply('unable to connect! server is probably down.')
@@ -451,7 +459,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
         description="removes the ID that you linked to your discord account."
     )
     async def unlink_bombsquda(self, ctx):
-        self.set_user_value(ctx.author.id, "squda_id", None)
+        self.bot.set_value(ctx.author.id, "squda_id", None)
         await ctx.reply("done! the previous ID was removed.")
 
 async def setup(bot) -> None:

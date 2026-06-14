@@ -25,6 +25,7 @@ from discord.ext.commands import Context
 from discord import app_commands
 from dotenv import load_dotenv, find_dotenv
 from playsound3 import playsound
+from pathlib import Path
 
 from database import DatabaseManager # type: ignore
 
@@ -65,12 +66,15 @@ intents.guild_typing = True
 intents.messages = True 
 intents.webhooks = True
 intents.typing = True
-SERVER_URL = "https://bombsquda.tailc76b25.ts.net/"
+SERVER_URL = "http://104.196.199.18:5000/"
 STATUS_CHANNEL_ID = int(os.getenv('STATUS_CHANNEL_ID'))
 STATUS_MESSAGE_ID = None
 STATUS_FILE = "status_message.json"
+DOWNLOADS = Path.home() / "Downloads"
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
+path = Path(__file__).resolve().parent
+DATA_FILE = path / 'userdata.json'
 
 """
 Uncomment this if you want to use prefix (normal) commands.
@@ -143,8 +147,6 @@ class SpazBot(commands.Bot):
         self.database = None
         self.bot_prefix = os.getenv("PREFIX")
         self.invite_link = os.getenv("INVITE_LINK")
-        lang_path = os.path.realpath(os.path.dirname(__file__)) + '/lang'
-        langstr.set_path(lang_path)
 
     async def init_db(self) -> None:
         async with aiosqlite.connect(
@@ -166,6 +168,44 @@ class SpazBot(commands.Bot):
             return None
         with open(STATUS_FILE, "r") as f:
             return json.load(f).get("message_id")
+    
+    def load_data(self):
+        if not os.path.exists(DATA_FILE):
+            return {}
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def save_data(self, data):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+
+    def get_value(self, user_id: int, label: str, default=0):
+        data = self.load_data()
+        return data.get(str(user_id), {}).get(label, default)
+
+    def set_value(self, user_id: int, label: str, value):
+        data = self.load_data()
+        uid = str(user_id)
+        if uid not in data:
+            data[uid] = {}
+        data[uid][label] = value
+        self.save_data(data)
+
+    def add_value(self, user_id: int, label: str, amount: int):
+        current = self.get_value(user_id, label, 0)
+        self.set_value(user_id, label, current + amount)
+        return current + amount
+    
+    def all_values(self, user_id: int):
+        data = self.load_data()
+        return data.get(str(user_id), {})
+    
+    def get_lang(self, user_id: int):
+        self.get_value(
+            user_id,
+            'language',
+            default='english',
+        )
             
     async def get_or_create_status_message(self, channel: discord.TextChannel):
         msg_id = self.load_status_message_id()
@@ -310,6 +350,30 @@ class SpazBot(commands.Bot):
             )
     
     async def on_message(self, message):
+        # PLEASE DONT REMOVE THI
+        if message.author.bot:
+            return
+        def match(keywords: list | str):
+            if isinstance(keywords, list):
+                for keyword in keywords:
+                    if keyword in message.content.lower():
+                        return True
+                return False
+            else:
+                if keywords in message.content.lower():
+                    return True
+                return False
+        if match('god'):
+            await message.reply(file=discord.File(DOWNLOADS / 'ohmygod.mov'))
+        if match('sorry'):
+            await message.reply('https://tenor.com/view/tawog-gif-5561445605726699769')
+        if (
+            '6' in message.content.lower() 
+            and '7' in message.content.lower()
+        ):
+            await message.reply('https://tenor.com/view/67-angry-bird-gif-6043271678546195943')
+        if match(['boom', 'bomb', 'squad', 'bom']):
+            await message.add_reaction('👀')
         await self.process_commands(message)
         
 bot = SpazBot()

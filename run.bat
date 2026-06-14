@@ -1,1 +1,1 @@
-py bot.py
+py %~dp0bot.py

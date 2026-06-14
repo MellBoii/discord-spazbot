@@ -15,6 +15,7 @@ import discord
 import requests
 import sys
 import os
+import langstr
 from mss import mss
 from pathlib import Path
 import mss
@@ -30,9 +31,6 @@ GREETINGS = [
     "name's spazbot!",
     "i'm up and runnin'!",
 ]
-path = f'{__file__}\\userdata.json'.replace('\\', '/') 
-path = path.replace('cogs/general.py/', '') 
-USER_DATA_FILE = path
 
 class HelpView(discord.ui.View):
     def __init__(self, *, bot: commands.Bot, author: discord.Member, pages: list[discord.Embed]):
@@ -219,6 +217,31 @@ class General(commands.Cog, name="General"):
             playsound(spath, block=False)
         await ctx.defer()
         await ctx.reply(file=discord.File(f'{filename}'))
+    
+    @commands.hybrid_command(
+        name="language",
+        description="sets your language!!",
+        aliases=['lang'],
+    )
+    async def set_lang(self, ctx: Context, lang: str):
+        if lang not in langstr.get_languages():
+            await ctx.reply(
+                langstr.LangStr(r='unknownLanguage',
+                    s=[
+                        ('${LANG}', lang),
+                        ('${LIST}', langstr.get_languages()),
+                    ],
+                    l='english',
+                )
+            )
+            return
+        self.bot.set_value(ctx.author.id, 'language', lang)
+        await ctx.reply(
+            langstr.LangStr(r='languageSet',
+                s=[('${LANG}', lang)],
+                l=lang,
+            )
+        )
 
 async def setup(bot) -> None:
     await bot.add_cog(General(bot))
