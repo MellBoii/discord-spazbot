@@ -319,7 +319,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
         description="Gets how much of a currency you have in the server's bank.",
     )
     async def test_getcur(self, ctx, currency: str):
-        id = self.get_value(ctx.author.id, "squda_id", '')
+        id = self.bot.get_value(ctx.author.id, "squda_id", '')
         if not id:
             await ctx.reply('hey get a squda id first please!')
             return
@@ -347,8 +347,8 @@ class Disquda(commands.Cog, name="CrossSquda"):
         description="Send a amount to your account in the server's bank.",
     )
     async def deposit_bank(self, ctx, amount: int, currency: str):
-        id = self.get_value(ctx.author.id, "squda_id", '')
-        player_amount = self.get_value(ctx.author.id, currency, 0)
+        id = self.bot.get_value(ctx.author.id, "squda_id", '')
+        player_amount = self.bot.get_value(ctx.author.id, currency, 0)
         if not id:
             await ctx.reply('hey get a squda id first please!')
             return
@@ -385,7 +385,7 @@ class Disquda(commands.Cog, name="CrossSquda"):
         description="Withdraw a amount from your bank in the server to your account.",
     )
     async def withdraw_bank(self, ctx, amount: int, currency: str):
-        id = self.get_value(ctx.author.id, "squda_id", '')
+        id = self.bot.get_value(ctx.author.id, "squda_id", '')
         data = {
             "bs_id": id,
             "type": currency,

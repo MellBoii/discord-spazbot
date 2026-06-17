@@ -371,7 +371,7 @@ class SpazBot(commands.Bot):
             '6' in message.content.lower() 
             and '7' in message.content.lower()
         ):
-            await message.reply('https://tenor.com/view/67-angry-bird-gif-6043271678546195943')
+            await message.reply('https://tenor.com/view/sixseven-six-seven-six-seve-67-gif-14143337669032958349')
         if match(['boom', 'bomb', 'squad', 'bom']):
             await message.add_reaction('👀')
         await self.process_commands(message)

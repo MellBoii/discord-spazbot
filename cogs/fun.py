@@ -294,7 +294,7 @@ def pick_random_sound():
     return None
 
 class CurrencyShareView(discord.ui.View):
-    def __init__(self, *, author, amount, user, contexto, currency_key, currency_config, emoji):
+    def __init__(self, *, author, amount, user, contexto, currency_key, currency_config, emoji, bot):
         super().__init__(timeout=None)
 
         self.author = author
@@ -305,6 +305,7 @@ class CurrencyShareView(discord.ui.View):
         self.currency_key = currency_key
         self.currency_config = currency_config
         self.emoji = emoji
+        self.bot = bot
 
         self.title = f"confirmation for {self.author.display_name}"
 
@@ -615,6 +616,7 @@ class Fun(commands.Cog, name="Fun"):
                 currency_key=currency,
                 currency_config=cfg,
                 emoji=emoji,
+                bot=self.bot,
             )
         )
         
